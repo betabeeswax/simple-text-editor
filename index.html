@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Text Editor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #e8eef5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 15px;
+      font-size: 24px;
+    }
+
+    .toolbar {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 8px 8px 0 0;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      width: 100%;
+      max-width: 900px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+    }
+
+    .toolbar button,
+    .toolbar label.btn {
+      background: #f0f4f8;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+
+    .toolbar button:hover,
+    .toolbar label.btn:hover {
+      background: #dce6f0;
+    }
+
+    .toolbar button:active {
+      background: #c5d4e8;
+    }
+
+    .toolbar select {
+      padding: 6px 8px;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .toolbar input[type="color"] {
+      width: 36px;
+      height: 32px;
+      border: 1px solid #bbb;
+      border-radius: 5px;
+      cursor: pointer;
+      padding: 2px;
+    }
+
+    .toolbar input[type="file"] {
+      display: none;
+    }
+
+    .separator {
+      width: 1px;
+      height: 24px;
+      background: #ccc;
+      margin: 0 4px;
+    }
+
+    .editor-area {
+      background: #fff;
+      border: 1px solid #ccc;
+      border-top: none;
+      border-radius: 0 0 8px 8px;
+      width: 100%;
+      max-width: 900px;
+      min-height: 450px;
+      padding: 20px;
+      position: relative;
+      overflow: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    #editor {
+      min-height: 400px;
+      outline: none;
+      line-height: 1.6;
+      font-size: 16px;
+      color: #222;
+    }
+
+    /* Draggable items (images and shapes) */
+    .draggable {
+      position: absolute;
+      cursor: move;
+      user-select: none;
+      z-index: 10;
+    }
+
+    .draggable img {
+      max-width: 250px;
+      max-height: 200px;
+      display: block;
+      border: 2px solid transparent;
+      border-radius: 4px;
+    }
+
+    .draggable:hover img,
+    .draggable.selected img {
+      border-color: #4a90d9;
+    }
+
+    .shape {
+      border: 2px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      color: #555;
+      background: rgba(100, 180, 255, 0.3);
+    }
+
+    .shape.rectangle {
+      width: 120px;
+      height: 80px;
+      border-radius: 4px;
+    }
+
+    .shape.circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+    }
+
+    .shape.triangle {
+      width: 0;
+      height: 0;
+      border-left: 60px solid transparent;
+      border-right: 60px solid transparent;
+      border-bottom: 100px solid rgba(100, 180, 255, 0.5);
+      background: transparent;
+      border-top: none;
+      border-style: solid;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #666;
+      font-size: 13px;
+      text-align: center;
+      max-width: 900px;
+    }
+
+    /* Hide toolbar and hints when printing to PDF */
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+      h1, .toolbar, .hint {
+        display: none !important;
+      }
+      .editor-area {
+        border: none;
+        box-shadow: none;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Simple Text Editor</h1>
+
+  <div class="toolbar">
+    <!-- Text formatting -->
+    <button type="button" onclick="format('bold')" title="Bold"><b>B</b></button>
+    <button type="button" onclick="format('italic')" title="Italic"><i>I</i></button>
+    <button type="button" onclick="format('underline')" title="Underline"><u>U</u></button>
+
+    <div class="separator"></div>
+
+    <!-- Font size -->
+    <select id="fontSize" onchange="changeFontSize(this.value)" title="Font size">
+      <option value="12px">12</option>
+      <option value="14px">14</option>
+      <option value="16px" selected>16</option>
+      <option value="18px">18</option>
+      <option value="20px">20</option>
+      <option value="24px">24</option>
+      <option value="28px">28</option>
+      <option value="32px">32</option>
+      <option value="40px">40</option>
+    </select>
+
+    <!-- Text color -->
+    <input type="color" id="textColor" value="#000000" onchange="changeColor(this.value)" title="Text color">
+
+    <div class="separator"></div>
+
+    <!-- Alignment -->
+    <button type="button" onclick="format('justifyLeft')" title="Align left">Left</button>
+    <button type="button" onclick="format('justifyCenter')" title="Align center">Center</button>
+    <button type="button" onclick="format('justifyRight')" title="Align right">Right</button>
+
+    <div class="separator"></div>
+
+    <!-- Lists -->
+    <button type="button" onclick="format('insertUnorderedList')" title="Bullet list">• List</button>
+    <button type="button" onclick="format('insertOrderedList')" title="Numbered list">1. List</button>
+
+    <div class="separator"></div>
+
+    <!-- Image -->
+    <label class="btn" title="Add photo">
+      📷 Photo
+      <input type="file" id="imageInput" accept="image/*" onchange="addImage(event)">
+    </label>
+
+    <!-- Shapes -->
+    <button type="button" onclick="addShape('rectangle')" title="Add rectangle">▭ Rect</button>
+    <button type="button" onclick="addShape('circle')" title="Add circle">○ Circle</button>
+    <button type="button" onclick="addShape('triangle')" title="Add triangle">△ Tri</button>
+
+    <div class="separator"></div>
+
+    <!-- File export options -->
+    <button type="button" onclick="saveAsHTML()" title="Download as HTML file">Save HTML</button>
+    <button type="button" onclick="saveAsTXT()" title="Download as plain text">Save TXT</button>
+    <button type="button" onclick="saveAsPDF()" title="Print or save as PDF">Save PDF</button>
+    <button type="button" onclick="clearAll()" title="Clear everything">Clear</button>
+  </div>
+
+  <div class="editor-area" id="editorArea">
+    <div id="editor" contenteditable="true">
+      Type your text here... You can change size and color using the buttons above.
+    </div>
+  </div>
+
+  <p class="hint">
+    Tip: Click and drag photos or shapes to move them. Use the toolbar for text style, color, and size.<br>
+    <strong>Save options:</strong> HTML (webpage), TXT (plain text), PDF (use browser print → Save as PDF).
+  </p>
+
+  <script>
+    // Make text bold, italic, etc.
+    function format(command) {
+      document.execCommand(command, false, null);
+      document.getElementById('editor').focus();
+    }
+
+    // Change font size of selected text
+    function changeFontSize(size) {
+      document.execCommand('fontSize', false, '7'); // temporary size
+      const fonts = document.querySelectorAll('#editor font[size="7"]');
+      fonts.forEach(f => {
+        f.removeAttribute('size');
+        f.style.fontSize = size;
+      });
+      document.getElementById('editor').focus();
+    }
+
+    // Change text color
+    function changeColor(color) {
+      document.execCommand('foreColor', false, color);
+      document.getElementById('editor').focus();
+    }
+
+    // Add an image from file
+    function addImage(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'draggable';
+        wrapper.style.left = '50px';
+        wrapper.style.top = '50px';
+
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.alt = 'Uploaded photo';
+        wrapper.appendChild(img);
+
+        document.getElementById('editorArea').appendChild(wrapper);
+        makeDraggable(wrapper);
+      };
+      reader.readAsDataURL(file);
+
+      // Reset input so same file can be chosen again
+      event.target.value = '';
+    }
+
+    // Add a shape
+    function addShape(type) {
+      const shape = document.createElement('div');
+      shape.className = 'draggable shape ' + type;
+      shape.style.left = '80px';
+      shape.style.top = '80px';
+
+      if (type === 'rectangle') shape.textContent = 'Rectangle';
+      if (type === 'circle') shape.textContent = 'Circle';
+      // triangle has no text because of CSS trick
+
+      document.getElementById('editorArea').appendChild(shape);
+      makeDraggable(shape);
+    }
+
+    // Make any element draggable
+    function makeDraggable(el) {
+      let isDragging = false;
+      let startX, startY, startLeft, startTop;
+
+      el.addEventListener('mousedown', function(e) {
+        // Only drag with left mouse button
+        if (e.button !== 0) return;
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = parseInt(el.style.left) || 0;
+        startTop = parseInt(el.style.top) || 0;
+        el.classList.add('selected');
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!isDragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        el.style.left = (startLeft + dx) + 'px';
+        el.style.top = (startTop + dy) + 'px';
+      });
+
+      document.addEventListener('mouseup', function() {
+        isDragging = false;
+        el.classList.remove('selected');
+      });
+    }
+
+    // Clear everything
+    function clearAll() {
+      if (confirm('Clear all text, photos, and shapes?')) {
+        document.getElementById('editor').innerHTML = '';
+        // Remove all draggables
+        document.querySelectorAll('.draggable').forEach(el => el.remove());
+      }
+    }
+
+    // ========== FILE EXPORT FUNCTIONS ==========
+
+    // Save as HTML file
+    function saveAsHTML() {
+      const content = document.getElementById('editorArea').innerHTML;
+      const fullHTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>My Document</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+    img { max-width: 100%; }
+  </style>
+</head>
+<body>
+${content}
+</body>
+</html>`;
+
+      downloadFile(fullHTML, 'my-document.html', 'text/html');
+    }
+
+    // Save as plain text (TXT)
+    function saveAsTXT() {
+      const text = document.getElementById('editor').innerText;
+      downloadFile(text, 'my-document.txt', 'text/plain');
+    }
+
+    // Save as PDF (uses browser print dialog → choose "Save as PDF")
+    function saveAsPDF() {
+      window.print();
+    }
+
+    // Helper: create and download a file
+    function downloadFile(content, filename, type) {
+      const blob = new Blob([content], { type: type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
